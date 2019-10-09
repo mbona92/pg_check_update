@@ -1,0 +1,359 @@
+#!/bin/bash
+
+action_usage() {
+	action=${1}
+	echo "Usage:"
+	echo "   $(basename $0) ${action} [OPTION] "
+	echo ""
+	echo "Actions:"
+	if [[ ${action} != "list" ]]; then
+		echo "  -d        database to check"
+		echo "  -h        database server host or socket directory"
+		echo "  -p        database server port number"
+		echo "  -U        connect as specified database user"
+	else
+		echo "  --delimiter        specify delimiter within single quote"
+		echo "  --quote            quote all column"
+		echo "  --no-header        do not print header"
+		echo "  --supported        show only supported version"
+	fi
+	echo ""
+	echo "  --help    display this help"
+	echo ""
+	echo 
+}
+
+getopt() {  
+	action=${1}
+	shift
+	while [[ ${#} -ge 1 ]]
+	do
+		arg=${1}
+		case ${arg} in
+			-d)
+				shift
+				if [[ ${action} == 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				[ -z "${1}" ] && log -p "$(basename ${0}): " DIE "${arg}: missing arguments"
+				pgdb="${1}"
+				shift
+				;;
+			-h)
+				shift
+				if [[ ${action} == 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				[ -z "${1}" ] && log -p "$(basename ${0}): " DIE "${arg}: missing arguments"
+				pghost="${1}"
+				shift
+				;;
+			-p)
+				shift
+				if [[ ${action} == 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				[ -z "${1}" ] && log -p "$(basename ${0}): " DIE "${arg}: missing arguments"
+				pgport="${1}"
+				shift
+				;;
+			-U)
+				shift
+				if [[ ${action} == 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				[ -z "${1}" ] && log -p "$(basename ${0}): " DIE "${arg}: missing arguments"
+				pguser="${1}"
+				shift
+				;;
+			--delimiter)
+				shift
+				if [[ ${action} != 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				[ -z "${1}" ] && log -p "$(basename ${0}): " DIE "${arg}: missing arguments"
+				delimiter="${1}"
+				shift
+				;;
+			--quote)
+				shift
+				if [[ ${action} != 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				f_quote=1
+				;;
+			--no-header)
+				shift
+				if [[ ${action} != 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				f_noheader=1
+				;;
+			--supported)
+				shift
+				if [[ ${action} != 'list' ]]; then
+					log ERR "Invalid Option ${arg} for action ${action}!"
+					action_usage ${action}
+					exit 1
+				fi
+				f_supported=1
+				;;
+			--help)
+				action_usage ${action}
+				exit
+				;;
+		esac
+	done
+}
+
+make_db_conn() {
+	conn_string="-d ${1} -h ${2} -U ${3} -p ${4}"
+	if ! errmsg=$(psql -A -t ${conn_string} -c "select 1" 2>&1) ; then
+		log ERR "Unable to connect to database ${1}! Error was: \n${errmsg}"
+		exit 1
+	fi
+	echo ${conn_string}
+}
+
+get_pg_version() {
+	conn_string="${1}"
+	pg_version=$(psql ${conn_string} ${psql_out_opt} -c "select current_setting('server_version')")
+	pg_major_version=$(echo ${pg_version} | cut -d '.' -f 1)
+	pg_minor_version=${pg_version}
+}
+
+get_index() {
+	search_item="${1}"
+	shift
+	arr=("${@}")
+	for i in "${!arr[@]}"
+	do
+		if [[ "${arr[$i]}" == "${search_item}" ]]; then
+			return ${i}
+		fi
+	done
+}
+
+get_version() {
+	declare -a open_tag_list=('<table>' '<thead>' '<tr>' '<th>' '<tbody>' '<td>')
+	declare -a close_tag_list=('</table>' '</thead>' '</tr>' '</th>' '</tbody>' '</td>')
+	declare -a inside_tag=(0 0 0 0 0 0 0)
+	declare -a thead_keys=()
+	declare -A thead=()
+	declare -a version=()
+	declare -a current_minor=()
+	declare -a supported=()
+	declare -a first_release=()
+	declare -a final_release=()
+	declare -i f_release=0
+	declare -i td_count=0
+	while read line
+	do
+		if [ ${f_release} -eq 0 ]; then
+			if echo ${line} | grep -Eqs "<h2>Releases</h2>"; then
+				f_release=1
+				continue
+			else
+				continue
+			fi
+		fi
+		echo ${line} | grep -Eqs '^$' && continue
+		if echo ${line} | grep -Eqs '^<' || echo ${line} | grep -Eqs '\>$'; then
+			open_tag=$(echo ${line} | grep -Eo '^<\w+[ ,>]')
+			if [ -n "${open_tag}" ]; then
+				open_tag=$(echo "${open_tag}" | sed 's/ $/>/')
+				get_index "${open_tag}" "${open_tag_list[@]}"
+				inside_tag[${?}]=1
+			fi
+			case ${open_tag} in
+				'<tr>')
+					td_count=0
+					;;
+				'<th>')
+					th_body=$(echo ${line} | sed 's/<th>// ; s/<\/th>//')
+					thead+=(["${th_body}"]="")
+					thead_keys+=("${th_body}")
+					;;
+				'<td>')
+					td_body=$(echo ${line} | sed 's/<td>// ; s/<\/td>//')
+					key=${thead_keys[${td_count}]}
+					if [[ ${key} == "First Release" || ${key} == "Final Release" ]]; then
+						td_body=$(date -d "${td_body}" +"%Y-%m-%d")
+					fi
+					thead["${key}"]+="${td_body} "
+					td_count+=1
+					;;
+			esac
+			close_tag=$(echo ${line} | grep -Eo '</\w+>$')
+			if [ -n "${close_tag}" ]; then
+				get_index "${close_tag}" "${close_tag_list[@]}"
+				inside_tag[${?}]=0
+			fi
+		fi
+		if [[ "${inside_tag[0]}" == "0" ]]; then
+			break
+		fi
+	done < <(cat ${out_dir}/postgresql_version.html)
+	
+	for key in "${!thead[@]}"
+	do
+		varname=$(echo ${key,,} | sed 's/ /_/')
+		case ${varname} in
+			'version')
+				version=(${thead["${key}"]})
+				;;
+			'current_minor')
+				current_minor=(${thead["${key}"]})
+				;;
+			'supported')
+				supported=(${thead["${key}"]})
+				;;
+			'first_release')
+				first_release=(${thead["${key}"]})
+				;;
+			'final_release')
+				final_release=(${thead["${key}"]})
+				;;
+			esac
+	done
+	# Create cache file
+	if ! touch ${out_dir}/.version_list.cache; then
+		log WARN "Cannot create cache file!"
+	fi
+	printf "%-20s %-20s %-20s %-20s %s\n" "Version" "Current_Minor" "Supported" "First_Release" "Final_Release" > ${out_dir}/.version_list.cache
+	for i in ${!version[@]}
+	do
+		printf "%-20s %-20s %-20s %-20s %s\n" "${version[${i}]}" "${current_minor[${i}]}" "${supported[${i}]}" "${first_release[${i}]}" "${final_release[${i}]}" >> ${out_dir}/.version_list.cache
+	done
+}
+
+get_version_list() {
+	if ! wget -T 5 https://www.postgresql.org/support/versioning/ -O ${out_dir}/postgresql_version.html >/dev/null 2>&1; then
+		log DIE "ERROR: wget https://www.postgresql.org/support/versioning/ is falied!"
+	fi
+	if [ -f ${out_dir}/postgresql_version.html.old ]; then
+		if ! cmp --silent ${out_dir}/postgresql_version.html ${out_dir}/postgresql_version.html.old; then
+			get_version
+		fi
+	else
+		get_version
+	fi
+	mv ${out_dir}/postgresql_version.html ${out_dir}/postgresql_version.html.old
+} 
+
+usage() {
+	echo "Usage:"
+	echo "   $(basename $0) ACTION [OPTION] "
+	echo ""
+	echo "Actions:"
+	echo "  major     check if major version is available"
+	echo "  minor     check if minor version is available"
+	echo "  list      list all version"
+	echo ""
+	echo "  --help    display this help"
+	echo ""
+	echo ""
+	echo "Use $(basename $0) ACTION --help to see specific action option"
+	echo 
+}
+	
+wdir=$(realpath $( dirname $0 ))
+out_dir=${wdir}/out
+psql_out_opt="-A -t -X"
+
+# Load bash_lib containig some usefull function
+if ! source ${wdir}/bash_lib; then
+	echo "Cannot load ${wdir}/bash_lib file!"
+	exit 1
+fi
+
+if [ ! -d ${out_dir} ]; then
+	if ! mkdir -p ${out_dir}; then
+		log DIE "Cannot create output directory ${out_dir}"
+	fi
+fi
+
+if [[ ${#} -lt 1 ]]; then 
+	usage
+	exit 1
+fi
+
+action=${1}
+case ${action} in
+	major)
+		getopt "${@}" 
+		conn_string=$(make_db_conn ${pgdb} ${pghost} ${pguser} ${pgport})
+		[ $? -gt 0 ] && exit 1
+		get_pg_version "${conn_string}"
+		get_version_list
+		current_major=$(head -2 ${out_dir}/.version_list.cache | tail -1 | awk '{print $1}')
+		if [[ ${current_major} != ${pg_major_version} ]]; then
+			echo "New major version(${current_major}) avaliable!"
+		else
+			echo "No new major version available!"
+		fi
+		;;   
+	minor)
+		getopt "${@}" 
+		conn_string=$(make_db_conn ${pgdb} ${pghost} ${pguser} ${pgport})
+		[ $? -gt 0 ] && exit 1
+		get_pg_version "${conn_string}"
+		get_version_list
+		current_minor=$(cat ${out_dir}/.version_list.cache | grep "^${pg_major_version}" | awk '{print $2}')
+		if (( $(echo "${current_minor} ${pg_minor_version}" | awk '{print ($1 > $2)}') )); then
+			echo "New minor version (${current_minor}) available!"
+		else
+			echo "You database is up to date! No new minor version for you pg major(${pg_major_version})!"
+		fi
+		;;
+	list)
+		declare -i f_quote=0
+		declare -i f_noheader=0
+		declare -i f_supported=0
+		body="cat ${out_dir}/.version_list.cache | tail -n +2"
+		header="cat ${out_dir}/.version_list.cache | head -1"
+		getopt "${@}"
+		get_version_list
+		if [ ${f_supported} -eq 1 ]; then
+			body=${body}" | awk '\$3 == \"Yes\"'"
+		fi
+		if [ ${f_quote} -eq 1 ] && [ -n "${delimiter}" ]; then
+			header=${header}" | sed -r 's/^/\"/ ; s/ +/\"${delimiter}\"/g ; s/$/\"/'"
+			body=${body}" | sed -r 's/^/\"/ ; s/ +/\"${delimiter}\"/g ; s/$/\"/'"
+		else
+			if [ ${f_quote} -eq 1 ]; then
+				header=${header}" | sed -r 's/^/\"/ ; s/( +)/\"\1\"/g ; s/$/\"/'"
+				body=${body}" | sed -r 's/^/\"/ ; s/( +)/\"\1\"/g ; s/$/\"/'"
+			else
+				if [ -n "${delimiter}" ]; then
+					header=${header}" | sed -r 's/ +/${delimiter}/g'"
+					body=${body}" | sed -r 's/ +/${delimiter}/g'"
+				fi
+			fi
+		fi
+		[ ${f_noheader} -eq 0 ] && eval "${header}"
+		eval "${body}"
+		;;   
+	--help)
+		usage
+		exit 0
+		;;   
+	*)   
+		log ERR "Action ${action} not found!"
+		exit 1
+		;;   
+esac
