@@ -23,7 +23,7 @@ Usage:
 Actions:
   major     check if major version is available
   minor     check if minor version is available
-  list      list all version
+  list      list all versions
 
   --help    display this help
 
@@ -58,7 +58,7 @@ New major version(12) avaliable!
 
 ### minor
 
-Check if new minor version (bug fix) ia available for yuor database.
+Check if new minor version (bug fix) is available for yuor database.
 
 ```bash
 [mbona92@arch pg_check_update]$ ./pg_check_update minor --help
@@ -145,5 +145,5 @@ Version              Current_Minor        Supported            First_Release    
 
 pg_check_update save file downloaded from https://www.postgresql.org/support/versioning/ in out directory and make a cache file.
 
-If new downloaded file is equale to the file downloaded in previuos run, pg_check_update use cache file instead of parse new file.
+If new downloaded file is equal to the file downloaded in previuos run, pg_check_update use cache file instead of parse new file.
 
