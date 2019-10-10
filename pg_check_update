@@ -132,7 +132,11 @@ make_db_conn() {
 get_pg_version() {
 	conn_string="${1}"
 	pg_version=$(psql ${conn_string} ${psql_out_opt} -c "select current_setting('server_version')")
-	pg_major_version=$(echo ${pg_version} | cut -d '.' -f 1)
+	if [[ $(echo ${pg_version} | grep -o '\.' | wc -l) -gt 1 ]]; then
+		pg_major_version=$(echo ${pg_version} | cut -d '.' -f 1,2)
+	else
+		pg_major_version=$(echo ${pg_version} | cut -d '.' -f 1)
+	fi
 	pg_minor_version=${pg_version}
 }
 
