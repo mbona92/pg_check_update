@@ -7,10 +7,10 @@ action_usage() {
 	echo ""
 	echo "Actions:"
 	if [[ ${action} != "list" ]]; then
-		echo "  -d        database to check"
-		echo "  -h        database server host or socket directory"
-		echo "  -p        database server port number"
-		echo "  -U        connect as specified database user"
+		echo "  -d        database to check (default: postgres)"
+		echo "  -h        database server host or socket directory (default: localhost)"
+		echo "  -p        database server port number (default: 5432)"
+		echo "  -U        connect as specified database user (default: postgres)"
 	else
 		echo "  --delimiter        specify delimiter within single quote"
 		echo "  --quote            quote all column"
@@ -262,7 +262,7 @@ usage() {
 	echo "Actions:"
 	echo "  major     check if major version is available"
 	echo "  minor     check if minor version is available"
-	echo "  list      list all version"
+	echo "  list      list all versions"
 	echo ""
 	echo "  --help    display this help"
 	echo ""
@@ -273,6 +273,10 @@ usage() {
 	
 wdir=$(realpath $( dirname $0 ))
 out_dir=${wdir}/out
+pgdb=postgres
+pgport=5432
+pghost=localhost
+pguser=postgres
 psql_out_opt="-A -t -X"
 
 # Load bash_lib containig some usefull function

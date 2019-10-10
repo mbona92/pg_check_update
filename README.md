@@ -1,7 +1,9 @@
 # pg_check_update
 
 pg_check_update is a script written in bash used to check if a postgres instance need update.
+
 pg_check_update retrive version list from https://www.postgresql.org/support/versioning/ and check if your database is up to date.
+
 If you are behind a proxy you have to set it before run pg_check_update. 
 
 ## Requirements
@@ -39,10 +41,10 @@ Usage:
    pg_check_update major [OPTION]
 
 Actions:
-  -d        database to check
-  -h        database server host or socket directory
-  -p        database server port number
-  -U        connect as specified database user
+  -d        database to check (default: postgres)
+  -h        database server host or socket directory (default: localhost)
+  -p        database server port number (default: 5432)
+  -U        connect as specified database user (default: postgres)
 
   --help    display this help
 
@@ -64,10 +66,10 @@ Usage:
    pg_check_update minor [OPTION]
 
 Actions:
-  -d        database to check
-  -h        database server host or socket directory
-  -p        database server port number
-  -U        connect as specified database user
+  -d        database to check (default: postgres)
+  -h        database server host or socket directory (default: localhost)
+  -p        database server port number (default: 5432)
+  -U        connect as specified database user (default: postgres)
 
   --help    display this help
 
@@ -142,5 +144,6 @@ Version              Current_Minor        Supported            First_Release    
 ## out directory
 
 pg_check_update save file downloaded from https://www.postgresql.org/support/versioning/ in out directory and make a cache file.
+
 If new downloaded file is equale to the file downloaded in previuos run, pg_check_update use cache file instead of parse new file.
 
