@@ -295,7 +295,7 @@ fi
 action=${1}
 case ${action} in
 	major)
-		getopt "${@}" 
+		getopt "${@}"
 		conn_string=$(make_db_conn ${pgdb} ${pghost} ${pguser} ${pgport})
 		[ $? -gt 0 ] && exit 1
 		get_pg_version "${conn_string}"
@@ -306,9 +306,9 @@ case ${action} in
 		else
 			echo "No new major version available!"
 		fi
-		;;   
+		;;
 	minor)
-		getopt "${@}" 
+		getopt "${@}"
 		conn_string=$(make_db_conn ${pgdb} ${pghost} ${pguser} ${pgport})
 		[ $? -gt 0 ] && exit 1
 		get_pg_version "${conn_string}"
@@ -317,7 +317,7 @@ case ${action} in
 		if (( $(echo "${current_minor} ${pg_minor_version}" | awk '{print ($1 > $2)}') )); then
 			echo "New minor version (${current_minor}) available!"
 		else
-			echo "You database is up to date! No new minor version for you pg major(${pg_major_version})!"
+			echo "Your database is up to date! No new minor version for your major(${pg_major_version})!"
 		fi
 		;;
 	list)
@@ -347,13 +347,13 @@ case ${action} in
 		fi
 		[ ${f_noheader} -eq 0 ] && eval "${header}"
 		eval "${body}"
-		;;   
+		;;
 	--help)
 		usage
 		exit 0
-		;;   
-	*)   
+		;;
+	*)
 		log ERR "Action ${action} not found!"
 		exit 1
-		;;   
+		;;
 esac
