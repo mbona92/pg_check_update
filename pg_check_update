@@ -5,12 +5,13 @@ action_usage() {
 	echo "Usage:"
 	echo "   $(basename $0) ${action} [OPTION] "
 	echo ""
-	echo "Actions:"
+	echo "Options:"
 	if [[ ${action} != "list" ]]; then
 		echo "  -d        database to check (default: postgres)"
 		echo "  -h        database server host or socket directory (default: localhost)"
 		echo "  -p        database server port number (default: 5432)"
 		echo "  -U        connect as specified database user (default: postgres)"
+		echo "  -P        if specified, prompt for postgres user's password"
 	else
 		echo "  --delimiter        specify delimiter within single quote"
 		echo "  --quote            quote all column"
@@ -23,7 +24,7 @@ action_usage() {
 	echo 
 }
 
-getopt() {  
+getopt() {
 	action=${1}
 	shift
 	while [[ ${#} -ge 1 ]]
@@ -33,7 +34,7 @@ getopt() {
 			-d)
 				shift
 				if [[ ${action} == 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -44,7 +45,7 @@ getopt() {
 			-h)
 				shift
 				if [[ ${action} == 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -55,7 +56,7 @@ getopt() {
 			-p)
 				shift
 				if [[ ${action} == 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -66,7 +67,7 @@ getopt() {
 			-U)
 				shift
 				if [[ ${action} == 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -74,10 +75,19 @@ getopt() {
 				pguser="${1}"
 				shift
 				;;
+			-P)
+				shift
+				if [[ ${action} == 'list' ]]; then
+					log ERR "Invalid Option ${arg} for ${action} action!"
+					action_usage ${action}
+					exit 1
+				fi
+				f_pgpwd=1
+				;;
 			--delimiter)
 				shift
 				if [[ ${action} != 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -88,7 +98,7 @@ getopt() {
 			--quote)
 				shift
 				if [[ ${action} != 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -97,7 +107,7 @@ getopt() {
 			--no-header)
 				shift
 				if [[ ${action} != 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -106,7 +116,7 @@ getopt() {
 			--supported)
 				shift
 				if [[ ${action} != 'list' ]]; then
-					log ERR "Invalid Option ${arg} for action ${action}!"
+					log ERR "Invalid Option ${arg} for ${action} action!"
 					action_usage ${action}
 					exit 1
 				fi
@@ -122,7 +132,7 @@ getopt() {
 
 make_db_conn() {
 	conn_string="-d ${1} -h ${2} -U ${3} -p ${4}"
-	if ! errmsg=$(psql -A -t ${conn_string} -c "select 1" 2>&1) ; then
+	if ! errmsg=$(PGPASSWORD=${pgpassword} psql -w ${psql_out_opt} ${conn_string} -c "select 1" 2>&1) ; then
 		log ERR "Unable to connect to database ${1}! Error was: \n${errmsg}"
 		exit 1
 	fi
@@ -131,7 +141,10 @@ make_db_conn() {
 
 get_pg_version() {
 	conn_string="${1}"
-	pg_version=$(psql ${conn_string} ${psql_out_opt} -c "select current_setting('server_version')")
+	pg_version=$(PGPASSWORD=${pgpassword} psql -w ${conn_string} ${psql_out_opt} -c "select current_setting('server_version')")
+	if [ -z "${pg_version}" ]; then
+		log DIE "Cannot retrieve postgres version!\n       Command was: psql -w ${conn_string} ${psql_out_opt} -c \"select current_setting('server_version')\""
+	fi
 	if [[ $(echo ${pg_version} | grep -o '\.' | wc -l) -gt 1 ]]; then
 		pg_major_version=$(echo ${pg_version} | cut -d '.' -f 1,2)
 	else
@@ -275,6 +288,7 @@ usage() {
 	echo 
 }
 	
+declare -i f_pgpwd=0
 wdir=$(realpath $( dirname $0 ))
 out_dir=${wdir}/out
 pgdb=postgres
@@ -283,7 +297,7 @@ pghost=localhost
 pguser=postgres
 psql_out_opt="-A -t -X"
 
-# Load bash_lib containig some usefull function
+# Load bash_lib containig some useful function
 if ! source ${wdir}/bash_lib; then
 	echo "Cannot load ${wdir}/bash_lib file!"
 	exit 1
@@ -304,19 +318,29 @@ action=${1}
 case ${action} in
 	major)
 		getopt "${@}"
+		if [ ${f_pgpwd} -eq 1 ]; then
+			echo -n "Insert password for user ${pguser}: "
+			read -s pgpassword
+			echo
+		fi
 		conn_string=$(make_db_conn ${pgdb} ${pghost} ${pguser} ${pgport})
 		[ $? -gt 0 ] && exit 1
 		get_pg_version "${conn_string}"
 		get_version_list
 		current_major=$(head -2 ${out_dir}/.version_list.cache | tail -1 | awk '{print $1}')
 		if [[ ${current_major} != ${pg_major_version} ]]; then
-			echo "New major version(${current_major}) avaliable!"
+			echo "New major version (${current_major}) avaliable!"
 		else
 			echo "No new major version available!"
 		fi
 		;;
 	minor)
 		getopt "${@}"
+		if [ ${f_pgpwd} -eq 1 ]; then
+			echo -n "Insert password for user ${pguser}: "
+			read -s pgpassword
+			echo
+		fi
 		conn_string=$(make_db_conn ${pgdb} ${pghost} ${pguser} ${pgport})
 		[ $? -gt 0 ] && exit 1
 		get_pg_version "${conn_string}"

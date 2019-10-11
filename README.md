@@ -1,6 +1,6 @@
 # pg_check_update
 
-pg_check_update is a script written in bash used to check if a postgres instance need update.
+pg_check_update is a script written in bash used to check if a postgres instance need version update.
 
 pg_check_update retrive version list from https://www.postgresql.org/support/versioning/ and check if your database is up to date.
 
@@ -40,11 +40,12 @@ Check if new major version is available for yuor database.
 Usage:
    pg_check_update major [OPTION]
 
-Actions:
+Options:
   -d        database to check (default: postgres)
   -h        database server host or socket directory (default: localhost)
   -p        database server port number (default: 5432)
   -U        connect as specified database user (default: postgres)
+  -P        if specified, prompt for postgres user's password
 
   --help    display this help
 
@@ -65,11 +66,12 @@ Check if new minor version (bug fix) is available for yuor database.
 Usage:
    pg_check_update minor [OPTION]
 
-Actions:
+Options:
   -d        database to check (default: postgres)
   -h        database server host or socket directory (default: localhost)
   -p        database server port number (default: 5432)
   -U        connect as specified database user (default: postgres)
+  -P        if specified, prompt for postgres user's password
 
   --help    display this help
 
@@ -92,7 +94,7 @@ It is possible to format output, for example, to load it in a database.
 Usage:
    pg_check_update list [OPTION]
 
-Actions:
+Options:
   --delimiter        specify delimiter within single quote
   --quote            quote all column
   --no-header        do not print header
@@ -143,7 +145,7 @@ Version              Current_Minor        Supported            First_Release    
 
 ## out directory
 
-pg_check_update save file downloaded from https://www.postgresql.org/support/versioning/ in out directory and make a cache file.
+pg_check_update save file downloaded from https://www.postgresql.org/support/versioning/ in **out** directory and make a cache file.
 
-If new downloaded file is equal to the file downloaded in previuos run, pg_check_update use cache file instead of parse new file.
+If new downloaded file is equal to the file downloaded in previuos run, pg_check_update use cache file instead of parse the new file.
 
