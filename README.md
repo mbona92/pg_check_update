@@ -10,6 +10,7 @@ If you are behind a proxy you have to set it before run pg_check_update.
 
 - Bash 4.0 or greater
 - wget
+- psql
 
 ## Actions
 
