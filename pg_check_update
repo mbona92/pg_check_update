@@ -7,19 +7,20 @@ action_usage() {
 	echo ""
 	echo "Options:"
 	if [[ ${action} != "list" ]]; then
-		echo "  -d        database to check (default: postgres)"
-		echo "  -h        database server host or socket directory (default: localhost)"
-		echo "  -p        database server port number (default: 5432)"
-		echo "  -U        connect as specified database user (default: postgres)"
-		echo "  -P        if specified, prompt for postgres user's password"
+		echo "  -d                 database to check (default: postgres)"
+		echo "  -h                 database server host or socket directory (default: localhost)"
+		echo "  -p                 database server port number (default: 5432)"
+		echo "  -U                 connect as specified database user (default: postgres)"
+		echo "  -P                 if specified, prompt for postgres user's password"
 	else
 		echo "  --delimiter        specify delimiter within single quote"
 		echo "  --quote            quote all column"
 		echo "  --no-header        do not print header"
 		echo "  --supported        show only supported version"
 	fi
+	echo "  -O                 secify out directory to save chache file"
 	echo ""
-	echo "  --help    display this help"
+	echo "  --help             display this help"
 	echo ""
 	echo 
 }
@@ -84,6 +85,12 @@ getopt() {
 				fi
 				f_pgpwd=1
 				;;
+			-O)
+				shift
+				[ -z "${1}" ] && log -p "$(basename ${0}): " DIE "${arg}: missing arguments"
+				out_dir=${1}
+				shift
+				;;
 			--delimiter)
 				shift
 				if [[ ${action} != 'list' ]]; then
@@ -125,6 +132,11 @@ getopt() {
 			--help)
 				action_usage ${action}
 				exit
+				;;
+			*)
+				log ERR "Option ${arg} not found!"
+				action_usage ${action}
+				exit 1
 				;;
 		esac
 	done
@@ -259,8 +271,13 @@ get_version() {
 }
 
 get_version_list() {
+	if [ ! -d ${out_dir} ]; then
+		if ! mkdir -p ${out_dir}; then
+			log DIE "Cannot create out directory ${out_dir}!"
+		fi
+	fi
 	if ! wget -T 5 https://www.postgresql.org/support/versioning/ -O ${out_dir}/postgresql_version.html >/dev/null 2>&1; then
-		log DIE "ERROR: wget https://www.postgresql.org/support/versioning/ is falied!"
+		log DIE "wget https://www.postgresql.org/support/versioning/ is falied!"
 	fi
 	if [ -f ${out_dir}/postgresql_version.html.old ]; then
 		if ! cmp --silent ${out_dir}/postgresql_version.html ${out_dir}/postgresql_version.html.old; then
@@ -346,7 +363,9 @@ case ${action} in
 		get_pg_version "${conn_string}"
 		get_version_list
 		current_minor=$(cat ${out_dir}/.version_list.cache | grep "^${pg_major_version}" | awk '{print $2}')
-		if (( $(echo "${current_minor} ${pg_minor_version}" | awk '{print ($1 > $2)}') )); then
+		minor_last_digits=$(echo ${pg_minor_version} | awk -F '.' '{ print $NF }')
+		current_minor_last_digits=$(echo ${current_minor} | awk -F '.' '{ print $NF }')
+		if (( $(echo "${current_minor_last_digits} ${minor_last_digits}" | awk '{print ($1 > $2)}') )); then
 			echo "New minor version (${current_minor}) available!"
 		else
 			echo "Your database is up to date! No new minor version for your major(${pg_major_version})!"

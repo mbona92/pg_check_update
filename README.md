@@ -2,7 +2,7 @@
 
 pg_check_update is a script written in bash used to check if a postgres instance need version update.
 
-pg_check_update retrive version list from https://www.postgresql.org/support/versioning/ and check if your database is up to date.
+pg_check_update retrieve version list from https://www.postgresql.org/support/versioning/ and check if your database is up to date.
 
 If you are behind a proxy you have to set it before run pg_check_update. 
 
@@ -17,7 +17,7 @@ If you are behind a proxy you have to set it before run pg_check_update.
 pg_check_update has the following actions:
 
 ```bash
-[matteo@arch pg_check_update]$ ./pg_check_update --help
+[mbona92@arch pg_check_update]$ ./pg_check_update --help
 Usage:
    pg_check_update ACTION [OPTION] 
 
@@ -39,16 +39,17 @@ Check if new major version is available for yuor database.
 ```bash
 [mbona92@arch pg_check_update]$ ./pg_check_update major --help
 Usage:
-   pg_check_update major [OPTION]
+   pg_check_update major [OPTION] 
 
 Options:
-  -d        database to check (default: postgres)
-  -h        database server host or socket directory (default: localhost)
-  -p        database server port number (default: 5432)
-  -U        connect as specified database user (default: postgres)
-  -P        if specified, prompt for postgres user's password
+  -d                 database to check (default: postgres)
+  -h                 database server host or socket directory (default: localhost)
+  -p                 database server port number (default: 5432)
+  -U                 connect as specified database user (default: postgres)
+  -P                 if specified, prompt for postgres user's password
+  -O                 secify out directory to save chache file
 
-  --help    display this help
+  --help             display this help
 
 ```
 Example:
@@ -65,16 +66,17 @@ Check if new minor version (bug fix) is available for yuor database.
 ```bash
 [mbona92@arch pg_check_update]$ ./pg_check_update minor --help
 Usage:
-   pg_check_update minor [OPTION]
+   pg_check_update minor [OPTION] 
 
 Options:
-  -d        database to check (default: postgres)
-  -h        database server host or socket directory (default: localhost)
-  -p        database server port number (default: 5432)
-  -U        connect as specified database user (default: postgres)
-  -P        if specified, prompt for postgres user's password
+  -d                 database to check (default: postgres)
+  -h                 database server host or socket directory (default: localhost)
+  -p                 database server port number (default: 5432)
+  -U                 connect as specified database user (default: postgres)
+  -P                 if specified, prompt for postgres user's password
+  -O                 secify out directory to save chache file
 
-  --help    display this help
+  --help             display this help
 
 ```
 
@@ -100,8 +102,10 @@ Options:
   --quote            quote all column
   --no-header        do not print header
   --supported        show only supported version
+  -O                 secify out directory to save chache file
 
-  --help    display this help
+  --help             display this help
+
 ```
 
 Examples:
